@@ -1,0 +1,18 @@
+RUN_NAME: 'cifar10_usl'
+
+DATASET:
+  NAME: 'cifar10'
+  TRANSFORM_NAME: 'CLD-cifar10'
+
+DATALOADER:
+  BATCH_SIZE: 128
+
+MODEL:
+  ARCH: 'ResNet18'
+  PRETRAIN_PATH: 'pretrained/cifar10_ckpt_epoch_200.pth'
+  # PRETRAIN_PATH: 'pretrained/model_cifar10_cls_res18.pth'
+
+FINETUNE:
+  LABELED_INDICES_PATH: '../selective_labeling/saved/cifar10_usl/selected_indices_40_5_2.npy'
+  # LABELED_INDICES_PATH: 'reliable_label_10360.npy'
+  REPEAT_DATA: 100

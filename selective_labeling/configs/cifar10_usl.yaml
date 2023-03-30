@@ -1,0 +1,21 @@
+RUN_NAME: 'cifar10_usl'
+
+SKIP_SAVE: False
+RECOMPUTE_ALL: True
+RECOMPUTE_NUM_DEP: True
+GAMMA: 1
+
+DATASET:
+  NAME: 'cifar10'
+  TRANSFORM_NAME: 'CLD-cifar10'
+
+MODEL:
+  ARCH: 'ResNet18'
+  PRETRAIN_PATH: 'pretrained/cifar10_ckpt_epoch_200.pth'
+  # PRETRAIN_PATH: 'pretrained/model_cifar10_cls_res18.pth'
+  USE_CLD: True
+
+USL:
+  NUM_SELECTED_SAMPLES: 40
+  KNN_K: 400
+  SEEDS: [1, 2, 3, 4, 5]
