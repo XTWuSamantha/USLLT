@@ -72,7 +72,7 @@ def main():
     parser.add_argument('--num-workers', type=int, default=4,
                         help='number of workers')
     parser.add_argument('--dataset', default='cifar10', type=str,
-                        choices=['cifar10', 'cifar10_cld_aug', 'cifar100'],
+                        choices=['cifar10', 'cifar10_cld_aug', 'cifar100','cifar10_imbalanced'],
                         help='dataset name')
     parser.add_argument('--num-labeled', type=int, default=4000,
                         help='number of labeled data')
@@ -130,6 +130,13 @@ def main():
                         help="For distributed training: local_rank")
     parser.add_argument('--no-progress', action='store_true',
                         help="don't use progress bar")
+    parser.add_argument('--MAX_NUM', type=int, default=5000,
+                        help='the most number of samples in a class')
+    parser.add_argument('--CLASS_NUM', type=int, default=10,
+                        help='number of classes')
+    parser.add_argument('--GAMMA', type=float, default=1,
+                        help='the ratio of the most number class to the least number class')
+
 
     args = parser.parse_args()
     global best_acc
@@ -194,7 +201,7 @@ def main():
         shutil.copyfile(__file__, os.path.join(args.out, 'train_copy.py'))
         args.writer = SummaryWriter(args.out)
 
-    if args.dataset == 'cifar10' or args.dataset == 'cifar10_cld_aug' or args.dataset == 'cifar10_lt':
+    if args.dataset == 'cifar10' or args.dataset == 'cifar10_cld_aug' or args.dataset == 'cifar10_lt' or args.dataset == 'cifar10_imbalanced':
         args.num_classes = 10
         if args.arch == 'wideresnet':
             args.model_depth = 28
