@@ -9,6 +9,9 @@ from . import cifar10_inds
 from . import cifar100_inds
 from .randaugment import RandAugmentMC
 
+import utils
+import random
+
 logger = logging.getLogger(__name__)
 
 cifar10_mean = (0.4914, 0.4822, 0.4465)
@@ -52,6 +55,43 @@ def get_cifar10(args, root, force_no_expand=False):
 
     return train_labeled_dataset, train_unlabeled_dataset, test_dataset
 
+def get_cifar10_imbalanced(args, root, force_no_expand=False):
+    transform_labeled = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomCrop(size=32,
+                              padding=int(32*0.125),
+                              padding_mode='reflect'),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+    ])
+    transform_val = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=cifar10_mean, std=cifar10_std)
+    ])
+    cifar10_dataset = datasets.CIFAR10(root, train=True, download=True)
+
+    sample_db = utils.make_imb_data(args.MAX_NUM, args.CLASS_NUM, args.GAMMA)
+    imb_idxs = utils.createImbIdxs(cifar10_dataset.targets, sample_db)
+    random.seed(10)
+    random.shuffle(imb_idxs)
+
+    base_dataset = utils.CIFAR10_LT(root, indexs=imb_idxs)
+
+    train_labeled_idxs, train_unlabeled_idxs = x_u_split(
+        args, base_dataset.targets, force_no_expand=force_no_expand)
+
+    train_labeled_dataset = CIFAR10SSL(
+        root, train_labeled_idxs, train=True,
+        transform=transform_labeled)
+
+    train_unlabeled_dataset = CIFAR10SSL(
+        root, train_unlabeled_idxs, train=True,
+        transform=TransformFixMatch(mean=cifar10_mean, std=cifar10_std))
+
+    test_dataset = datasets.CIFAR10(
+        root, train=False, transform=transform_val, download=False)
+
+    return train_labeled_dataset, train_unlabeled_dataset, test_dataset
 
 
 def get_cifar10_cld_aug(args, root, force_no_expand=False):
@@ -134,6 +174,7 @@ def get_labeled_inds(args, labels):
     print(labeled_idx)
     return labeled_idx
 
+
 def x_u_split(args, labels, force_no_expand=False):
     
     labels = np.array(labels)
@@ -144,12 +185,12 @@ def x_u_split(args, labels, force_no_expand=False):
     if args.get_labeled_inds.startswith("slice"):
         labeled_idx = get_labeled_inds(args, labels)
     elif "random" in args.get_labeled_inds:
-        if args.dataset == "cifar10":
+        if args.dataset == "cifar10" or args.dataset == 'cifar10_imbalanced':
             labeled_idx = cifar10_inds.get_labeled_inds_random(args, labels, args.get_labeled_inds)
         elif args.dataset == "cifar100":
             labeled_idx = cifar100_inds.get_labeled_inds_random(args, labels, args.get_labeled_inds)
     elif "selected" in args.get_labeled_inds:
-        if args.dataset == "cifar10":
+        if args.dataset == "cifar10" or args.dataset == 'cifar10_imbalanced':
             labeled_idx = cifar10_inds.get_labeled_inds_select(args, labels, args.get_labeled_inds)
         elif args.dataset == "cifar100":
             labeled_idx = cifar100_inds.get_labeled_inds_select(args, labels, args.get_labeled_inds)
@@ -246,4 +287,5 @@ class CIFAR100SSL(datasets.CIFAR100):
 
 DATASET_GETTERS = {'cifar10': get_cifar10,
                    'cifar100': get_cifar100,
-                   'cifar10_cld_aug': get_cifar10_cld_aug}
+                   'cifar10_cld_aug': get_cifar10_cld_aug,
+                   'cifar10_imbalanced': get_cifar10_imbalanced}
