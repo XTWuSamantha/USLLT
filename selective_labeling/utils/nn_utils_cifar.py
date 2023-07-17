@@ -62,80 +62,80 @@ def get_sample_info_cifar(chosen_sample_num, selected_num):
     return num_centroids, final_sample_num
 
 
-def get_selection_with_reg(data, neighbors_dist, cluster_labels, num_centroids, final_sample_num, iters=1, w=1, momentum=0.5, horizon_dist=None, alpha=1, verbose=False):
-    selection_regularizer = torch.zeros_like(neighbors_dist)
-    selected_ids_comparison_mask = F.one_hot(
-        cluster_labels, num_classes=num_centroids)
-    for _ in tqdm(range(iters)):
-        selected_inds = []
-        selected_inds_max = []
-        selected_scores = []
-        for cls_ind in range(num_centroids):
-            if len(selected_inds) == final_sample_num:
-                break
-            match_arr = cluster_labels == cls_ind
-            match = torch.where(match_arr)[0]
-            if len(match) == 0:
-                continue
+# def get_selection_with_reg(data, neighbors_dist, cluster_labels, num_centroids, final_sample_num, iters=1, w=1, momentum=0.5, horizon_dist=None, alpha=1, verbose=False):
+#     selection_regularizer = torch.zeros_like(neighbors_dist)
+#     selected_ids_comparison_mask = F.one_hot(
+#         cluster_labels, num_classes=num_centroids)
+#     for _ in tqdm(range(iters)):
+#         selected_inds = []
+#         selected_inds_max = []
+#         selected_scores = []
+#         for cls_ind in range(num_centroids):
+#             if len(selected_inds) == final_sample_num:
+#                 break
+#             match_arr = cluster_labels == cls_ind
+#             match = torch.where(match_arr)[0]
+#             if len(match) == 0:
+#                 continue
 
-            # Scores in the selection process
-            scores = 1 / neighbors_dist[match_arr] - \
-                w * selection_regularizer[match_arr]
-            scores_list = scores.tolist()
-            n = int(final_sample_num/num_centroids)
-            min_dist_ind = pd.Series(scores_list).sort_values(ascending = False).index[:n]
-            min_dist_ind_max = scores.argmax()
-            selected_inds_max.append(match[min_dist_ind_max])
-            for i in min_dist_ind:
-                selected_inds.append(match[i])
-                selected_scores.append(scores[i])
+#             # Scores in the selection process
+#             scores = 1 / neighbors_dist[match_arr] - \
+#                 w * selection_regularizer[match_arr]
+#             scores_list = scores.tolist()
+#             n = int(final_sample_num/num_centroids)
+#             min_dist_ind = pd.Series(scores_list).sort_values(ascending = False).index[:n]
+#             min_dist_ind_max = scores.argmax()
+#             selected_inds_max.append(match[min_dist_ind_max])
+#             for i in min_dist_ind:
+#                 selected_inds.append(match[i])
+#                 selected_scores.append(scores[i])
 
-        selected_inds = np.array(selected_inds)
-        selected_data = data[selected_inds]
-        selected_inds_max = np.array(selected_inds_max)
-        selected_data_max = data[selected_inds_max]
-        selected_scores = np.array(selected_scores)
-        zipped = zip(selected_inds, selected_scores)
-        sort_zipped = sorted(zipped, key=lambda x: (x[1], x[0]), reverse = True)
-        result = zip(*sort_zipped)
-        selected_inds, selected_scores = [list(x) for x in result]
-        # print(selected_inds_max)
-        # print(selected_inds)
-        # This is square distances: (N_full, N_selected)
-        # data: (N_full, 1, dim)
-        # selected_data: (1, N_selected, dim)
-        new_selection_regularizer = (
-            (data[:, None, :] - selected_data_max[None, :, :]) ** 2).sum(dim=-1)
+#         selected_inds = np.array(selected_inds)
+#         selected_data = data[selected_inds]
+#         selected_inds_max = np.array(selected_inds_max)
+#         selected_data_max = data[selected_inds_max]
+#         selected_scores = np.array(selected_scores)
+#         zipped = zip(selected_inds, selected_scores)
+#         sort_zipped = sorted(zipped, key=lambda x: (x[1], x[0]), reverse = True)
+#         result = zip(*sort_zipped)
+#         selected_inds, selected_scores = [list(x) for x in result]
+#         # print(selected_inds_max)
+#         # print(selected_inds)
+#         # This is square distances: (N_full, N_selected)
+#         # data: (N_full, 1, dim)
+#         # selected_data: (1, N_selected, dim)
+#         new_selection_regularizer = (
+#             (data[:, None, :] - selected_data_max[None, :, :]) ** 2).sum(dim=-1)
 
-        if verbose:
-            logger.info(
-                f"Max: {new_selection_regularizer.max()} Mean: {new_selection_regularizer.mean()}")
+#         if verbose:
+#             logger.info(
+#                 f"Max: {new_selection_regularizer.max()} Mean: {new_selection_regularizer.mean()}")
 
-        # Distance to the instance within the same cluster should be ignored
-        new_selection_regularizer = (1 - selected_ids_comparison_mask) * \
-            new_selection_regularizer + selected_ids_comparison_mask * 1e10
+#         # Distance to the instance within the same cluster should be ignored
+#         new_selection_regularizer = (1 - selected_ids_comparison_mask) * \
+#             new_selection_regularizer + selected_ids_comparison_mask * 1e10
 
-        assert not torch.any(new_selection_regularizer == 0), "{}".format(
-            torch.where(new_selection_regularizer == 0))
+#         assert not torch.any(new_selection_regularizer == 0), "{}".format(
+#             torch.where(new_selection_regularizer == 0))
 
-        if verbose:
-            logger.info(f"Min: {new_selection_regularizer.min()}")
+#         if verbose:
+#             logger.info(f"Min: {new_selection_regularizer.min()}")
 
-        # If it is outside of horizon dist (square distance), than we ignore it.
-        if horizon_dist is not None:
-            new_selection_regularizer[new_selection_regularizer >=
-                                      horizon_dist] = 1e10
+#         # If it is outside of horizon dist (square distance), than we ignore it.
+#         if horizon_dist is not None:
+#             new_selection_regularizer[new_selection_regularizer >=
+#                                       horizon_dist] = 1e10
 
-        # selection_regularizer: N_full
-        new_selection_regularizer = (
-            1 / new_selection_regularizer ** alpha).sum(dim=1)
+#         # selection_regularizer: N_full
+#         new_selection_regularizer = (
+#             1 / new_selection_regularizer ** alpha).sum(dim=1)
 
-        selection_regularizer = selection_regularizer * \
-            momentum + new_selection_regularizer * (1 - momentum)
+#         selection_regularizer = selection_regularizer * \
+#             momentum + new_selection_regularizer * (1 - momentum)
 
-    assert len(
-        selected_inds) == final_sample_num, f"{len(selected_inds)} != {final_sample_num}"
-    return selected_inds, selected_scores
+#     assert len(
+#         selected_inds) == final_sample_num, f"{len(selected_inds)} != {final_sample_num}"
+#     return selected_inds, selected_scores
 
 
 # def get_selection_with_reg(data, neighbors_dist, cluster_labels, num_centroids, final_sample_num, iters=1, w=1, momentum=0.5, horizon_dist=None, alpha=1, verbose=False):
@@ -195,6 +195,184 @@ def get_selection_with_reg(data, neighbors_dist, cluster_labels, num_centroids, 
 #     assert len(
 #         selected_inds) == final_sample_num, f"{len(selected_inds)} != {final_sample_num}"
 #     return selected_inds
+
+
+def get_selection_with_reg(data, neighbors_dist, cluster_labels, num_centroids, final_sample_num, iters=1, w=1, momentum=0.5, horizon_dist=None, alpha=1, verbose=False):
+    selection_regularizer = torch.zeros_like(neighbors_dist)
+    selected_ids_comparison_mask = F.one_hot(
+        cluster_labels, num_classes=num_centroids)
+    for _ in tqdm(range(iters)):
+        selected_inds = []
+        selected_inds_max = []
+        selected_scores = []
+        for cls_ind in range(num_centroids):
+            if len(selected_inds) == final_sample_num:
+                break
+            match_arr = cluster_labels == cls_ind
+            match = torch.where(match_arr)[0]
+            if len(match) == 0:
+                continue
+
+            # Scores in the selection process
+            scores = 1 / neighbors_dist[match_arr] - \
+                w * selection_regularizer[match_arr]
+            scores_list = scores.tolist()
+            n = int(final_sample_num/num_centroids)
+            min_dist_ind = pd.Series(scores_list).sort_values(ascending = False).index[:n]
+            min_dist_ind_max = scores.argmax()
+            selected_inds_max.append(match[min_dist_ind_max])
+            for i in min_dist_ind:
+                selected_inds.append(match[i])
+                selected_scores.append(scores[i])
+
+        selected_inds = np.array(selected_inds)
+        selected_data = data[selected_inds]
+        selected_inds_max = np.array(selected_inds_max)
+        selected_data_max = data[selected_inds_max]
+        selected_scores = np.array(selected_scores)
+        zipped = zip(selected_inds, selected_scores)
+        sort_zipped = sorted(zipped, key=lambda x: (x[1], x[0]), reverse = True)
+        result = zip(*sort_zipped)
+        selected_inds, selected_scores = [list(x) for x in result]
+        # print(selected_scores)
+        # print(selected_inds_max)
+        # print(selected_inds)
+        # This is square distances: (N_full, N_selected)
+        # data: (N_full, 1, dim)
+        # selected_data: (1, N_selected, dim)
+        new_selection_regularizer = (
+            (data[:, None, :] - selected_data_max[None, :, :]) ** 2).sum(dim=-1)
+        
+
+        if verbose:
+            logger.info(
+                f"Max: {new_selection_regularizer.max()} Mean: {new_selection_regularizer.mean()}")
+
+        # Distance to the instance within the same cluster should be ignored
+        # inter
+        new_selection_regularizer = (1 - selected_ids_comparison_mask) * \
+            new_selection_regularizer + selected_ids_comparison_mask * 1e10
+        
+        # all samples
+        # new_selection_regularizer = new_selection_regularizer + selected_ids_comparison_mask * 1e10
+
+        # all samples with different weight(need to be tested)
+        # new_selection_regularizer = new_selection_regularizer + selected_ids_comparison_mask * (1e11* new_selection_regularizer + 1e10)
+
+        # intra
+        # new_selection_regularizer = selected_ids_comparison_mask * new_selection_regularizer +  1e10
+
+        assert not torch.any(new_selection_regularizer == 0), "{}".format(
+            torch.where(new_selection_regularizer == 0))
+
+        if verbose:
+            logger.info(f"Max: {new_selection_regularizer.max()} Mean: {new_selection_regularizer.mean()} Min: {new_selection_regularizer.min()}")
+
+        # If it is outside of horizon dist (square distance), than we ignore it.
+        if horizon_dist is not None:
+            new_selection_regularizer[new_selection_regularizer >=
+                                      horizon_dist] = 1e10
+
+        # selection_regularizer: N_full
+        new_selection_regularizer = (
+            1 / new_selection_regularizer ** alpha).sum(dim=1)
+
+        selection_regularizer = selection_regularizer * \
+            momentum + new_selection_regularizer * (1 - momentum)
+
+    assert len(
+        selected_inds) == final_sample_num, f"{len(selected_inds)} != {final_sample_num}"
+    return selected_inds, selected_scores
+
+
+# low density
+def get_selection_with_reg_low(data, neighbors_dist, cluster_labels, num_centroids, final_sample_num, iters=1, w=1, momentum=0.5, horizon_dist=None, alpha=1, verbose=False):
+    selection_regularizer = torch.zeros_like(neighbors_dist)
+    selected_ids_comparison_mask = F.one_hot(
+        cluster_labels, num_classes=num_centroids)
+    for _ in tqdm(range(iters)):
+        selected_inds = []
+        selected_inds_max = []
+        selected_scores = []
+        for cls_ind in range(num_centroids):
+            if len(selected_inds) == final_sample_num:
+                break
+            match_arr = cluster_labels == cls_ind
+            match = torch.where(match_arr)[0]
+            if len(match) == 0:
+                continue
+
+            # Scores in the selection process
+            # 这里对scores进行了更改，同时把max改成了min
+            scores = 1 / neighbors_dist[match_arr] + \
+                w * selection_regularizer[match_arr]
+            scores_list = scores.tolist()
+            n = int(final_sample_num/num_centroids)
+            min_dist_ind = pd.Series(scores_list).sort_values(ascending = True).index[:n]
+            min_dist_ind_max = scores.argmin()
+            selected_inds_max.append(match[min_dist_ind_max])
+            for i in min_dist_ind:
+                selected_inds.append(match[i])
+                selected_scores.append(scores[i])
+
+        selected_inds = np.array(selected_inds)
+        selected_data = data[selected_inds]
+        selected_inds_max = np.array(selected_inds_max)
+        selected_data_max = data[selected_inds_max]
+        selected_scores = np.array(selected_scores)
+        zipped = zip(selected_inds, selected_scores)
+        sort_zipped = sorted(zipped, key=lambda x: (x[1], x[0]), reverse = True)
+        result = zip(*sort_zipped)
+        selected_inds, selected_scores = [list(x) for x in result]
+        # print(selected_inds_max)
+        # print(selected_inds)
+        # This is square distances: (N_full, N_selected)
+        # data: (N_full, 1, dim)
+        # selected_data: (1, N_selected, dim)
+        new_selection_regularizer = (
+            (data[:, None, :] - selected_data_max[None, :, :]) ** 2).sum(dim=-1)
+        
+
+        if verbose:
+            logger.info(
+                f"Max: {new_selection_regularizer.max()} Mean: {new_selection_regularizer.mean()}")
+
+        # Distance to the instance within the same cluster should be ignored
+        # inter
+        new_selection_regularizer = (1 - selected_ids_comparison_mask) * \
+            new_selection_regularizer + selected_ids_comparison_mask * 1e10
+        
+        # all samples
+        # new_selection_regularizer = new_selection_regularizer + selected_ids_comparison_mask * 1e10
+
+        # all samples with different weight(need to be tested)
+        # new_selection_regularizer = new_selection_regularizer + selected_ids_comparison_mask * (1e11* new_selection_regularizer + 1e10)
+
+        # intra
+        # new_selection_regularizer = selected_ids_comparison_mask * new_selection_regularizer +  1e10
+
+        assert not torch.any(new_selection_regularizer == 0), "{}".format(
+            torch.where(new_selection_regularizer == 0))
+
+        if verbose:
+            logger.info(f"Min: {new_selection_regularizer.min()}")
+
+        # If it is outside of horizon dist (square distance), than we ignore it.
+        if horizon_dist is not None:
+            new_selection_regularizer[new_selection_regularizer >=
+                                      horizon_dist] = 1e10
+
+        # selection_regularizer: N_full
+        new_selection_regularizer = (
+            1 / new_selection_regularizer ** alpha).sum(dim=1)
+
+        selection_regularizer = selection_regularizer * \
+            momentum + new_selection_regularizer * (1 - momentum)
+
+    assert len(
+        selected_inds) == final_sample_num, f"{len(selected_inds)} != {final_sample_num}"
+    return selected_inds, selected_scores
+
 
 
 class GaussianBlur(object):
