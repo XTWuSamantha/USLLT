@@ -17,10 +17,10 @@ _C.RECOMPUTE_ALL = True
 # Set to True to recompute NUM_SELECTED_SAMPLES dependent steps such as k-Means and selection even if RECOMPUTE_ALL is False
 _C.RECOMPUTE_NUM_DEP = True
 
-# imbalance
+# imbalance 
 _C.GAMMA = 1
 _C.MAX_NUM = 5000
-_C.CLASS_NUM = 40
+_C.CLASS_NUM = 10
 
 _C.DATASET = CN()
 _C.DATASET.NAME = ''
@@ -48,7 +48,7 @@ if mode == "USL":
     _C.USL.REG = CN()
     _C.USL.REG.NITERS = 10
     # W is the lambda in math expressions
-    _C.USL.REG.W = 0.5
+    _C.USL.REG.W = 0.8
     _C.USL.REG.MOMENTUM = 0.9
     _C.USL.REG.HORIZON_DIST = 4
     _C.USL.REG.ALPHA = 0.5
