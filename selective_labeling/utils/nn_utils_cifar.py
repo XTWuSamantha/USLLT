@@ -49,9 +49,9 @@ class CIFAR10_LT(datasets.CIFAR10):
 
         return img, target
 
-def get_sample_info_cifar(chosen_sample_num, selected_num):
-    num_centroids = chosen_sample_num
-    final_sample_num = selected_num
+def get_sample_info_cifar(class_num, chosen_sample_num):
+    num_centroids = class_num
+    final_sample_num = chosen_sample_num
 
     # We get one more centroid to take empty clusters into account
     if chosen_sample_num == 2500:
@@ -60,6 +60,7 @@ def get_sample_info_cifar(chosen_sample_num, selected_num):
         logger.warning("Returning 2501 as the number of centroids")
 
     return num_centroids, final_sample_num
+
 
 
 # def get_selection_with_reg(data, neighbors_dist, cluster_labels, num_centroids, final_sample_num, iters=1, w=1, momentum=0.5, horizon_dist=None, alpha=1, verbose=False):
